@@ -12,10 +12,13 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-# ─── Dados ─────────────────────────────────────────────────────────────────────
-DATA_DIR = Path("nexus_data")
+# ─── Dados — salva localmente ou usa session state no Cloud ───────────────────
+DATA_DIR = Path(__file__).parent / "nexus_data"
 USERS_FILE = DATA_DIR / "users.json"
-DATA_DIR.mkdir(exist_ok=True)
+try:
+    DATA_DIR.mkdir(exist_ok=True)
+except Exception:
+    pass
 
 st.set_page_config(page_title="NEXUS", page_icon="◈", layout="wide", initial_sidebar_state="expanded")
 
@@ -305,9 +308,14 @@ def executar_ferramenta(nome, inputs):
 # ─── Processar Resposta com Claude Sonnet ─────────────────────────────────────
 def processar_resposta(prompt: str) -> str:
     user = st.session_state.user
-    api_key = user["configuracoes"].get("anthropic_key", "").strip()
+    # Tenta: 1) Secrets do Streamlit Cloud, 2) variável de ambiente, 3) configurações do usuário
+    api_key = (
+        st.secrets.get("ANTHROPIC_API_KEY", "") or
+        os.environ.get("ANTHROPIC_API_KEY", "") or
+        user["configuracoes"].get("anthropic_key", "")
+    ).strip()
     if not api_key:
-        return "⚠️ Configure sua **API Key** em ⚙️ Configurações para usar o NEXUS.\n\n👉 Obtenha em: **console.anthropic.com**"
+        return "⚠️ API Key não encontrada. Peça ao administrador do site para configurar nas **Secrets** do Streamlit Cloud."
 
     client = anthropic.Anthropic(api_key=api_key)
     st.session_state.historico_api.append({"role": "user", "content": prompt})
